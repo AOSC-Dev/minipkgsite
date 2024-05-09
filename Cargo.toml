@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 axum = "0.7.5"
 redis = { version = "0.25", features = ["tokio-comp"] }
-tokio = { version = "1.37.0", features = ["macros", "rt-multi-thread", "fs"] }
+tokio = { version = "1.37.0", features = ["macros", "rt-multi-thread", "fs", "process"] }
 eyre = "0.6"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

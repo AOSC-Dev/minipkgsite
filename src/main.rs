@@ -1,9 +1,13 @@
 mod abbs;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use abbs::Abbs;
+use axum::{
+    extract::{Query, State}, http::StatusCode, response::IntoResponse, routing::get, Json, Router
+};
 use eyre::Result;
-use tokio::time::sleep;
+use serde::{Deserialize, Serialize};
+use tokio::{sync::Mutex, time::sleep};
 use tracing::{error, level_filters::LevelFilter};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
@@ -11,6 +15,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 async fn main() -> Result<()> {
     let abbs_url = std::env::var("ABBS_TREE")?;
     let redis = std::env::var("REDIS")?;
+    let listen = std::env::var("MINIPKGSITE")?;
 
     let env_log = EnvFilter::try_from_default_env();
 
@@ -40,17 +45,52 @@ async fn main() -> Result<()> {
             .init();
     }
 
-    loop {
-        if let Err(e) = tokio::try_join!(update_db(redis.clone(), abbs_url.clone())) {
-            error!("{e}");
-        }
+    let client = redis::Client::open(redis)?;
+    let conn = client.get_multiplexed_tokio_connection().await?;
+    let abbs = Arc::new(Mutex::new(Abbs::new(conn)?));
+    let ac = abbs.clone();
 
-        sleep(std::time::Duration::from_secs(60)).await;
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = update_db(abbs.clone(), abbs_url.clone()).await {
+                error!("{e}");
+            }
+
+            sleep(Duration::from_secs(60)).await;
+        }
+    });
+
+    let app = Router::new().route("/package", get(package)).with_state(ac);
+    let listener = tokio::net::TcpListener::bind(&listen).await?;
+    axum::serve(listener, app).await?;
+
+    Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct Response {
+    name: String,
+}
+
+async fn package(
+    State(state): State<Arc<Mutex<Abbs>>>,
+    Query(payload): Query<Response>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let mut abbs = state.lock().await;
+    let pkg = payload.name;
+    let pkg = abbs.get(&pkg).await;
+
+    match pkg {
+        Ok(pkg) => Ok(Json(pkg)),
+        Err(e) => {
+            error!("{e}");
+            Err(StatusCode::NOT_FOUND)
+        }
     }
 }
 
-async fn update_db(redis: String, abbs_url: String) -> Result<()> {
-    let abbs = Abbs::new(&redis)?;
+async fn update_db(abbs: Arc<Mutex<Abbs>>, abbs_url: String) -> Result<()> {
+    let mut abbs = abbs.lock().await;
     abbs.update_all(PathBuf::from(abbs_url)).await?;
 
     Ok(())

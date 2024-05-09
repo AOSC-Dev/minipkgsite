@@ -1,19 +1,20 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use dashmap::DashMap;
-use eyre::{eyre, Context, OptionExt, Result};
-use redis::{AsyncCommands, Client};
-use serde::Serialize;
+use eyre::{eyre, OptionExt, Result};
+use redis::{aio::MultiplexedConnection, AsyncCommands};
+use serde::{Deserialize, Serialize};
+use tokio::process::Command;
 use tracing::{info, warn};
 use walkdir::WalkDir;
 
 pub struct Abbs {
-    client: Client,
+    conn: MultiplexedConnection,
     pkgs: Arc<DashMap<String, Package>>,
 }
 
-#[derive(Debug, Serialize)]
-struct Package {
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Package {
     name: String,
     version: String,
     desc: String,
@@ -25,7 +26,7 @@ struct Package {
     provides: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct PkgStmt {
     name: String,
     comp: String,
@@ -41,30 +42,40 @@ struct PkgStmt {
 // }
 
 impl Abbs {
-    pub fn new(url: &str) -> Result<Abbs> {
-        let client = redis::Client::open(url).context("Failed to connect redis database")?;
+    pub fn new(client: MultiplexedConnection) -> Result<Abbs> {
         let pkgs = Arc::new(DashMap::new());
 
-        Ok(Abbs { client, pkgs })
+        Ok(Abbs { conn: client, pkgs })
     }
 
-    pub async fn update_all(&self, git_path: PathBuf) -> Result<()> {
-        let pkg = self.pkgs.clone();
-        let res =
-            tokio::task::spawn_blocking(move || collection_packages(git_path, &pkg)).await??;
+    pub async fn update_all(&mut self, git_path: PathBuf) -> Result<()> {
+        let out = Command::new("git")
+            .arg("pull")
+            .current_dir(&git_path)
+            .output()
+            .await?;
 
-        let mut conn = self.client.get_multiplexed_tokio_connection().await?;
+        info!("git pull stdout: {:?}", out.stdout);
+        info!("git pull stderr: {:?}", out.stdout);
+
+        let res = tokio::task::spawn_blocking(move || collection_packages(git_path)).await??;
 
         for i in res {
-            conn.set(&i.name, serde_json::to_string(&i)?).await?;
+            self.conn.set(&i.name, serde_json::to_string(&i)?).await?;
         }
 
         Ok(())
     }
+
+    pub async fn get(&mut self, name: &str) -> Result<Package> {
+        let res = self.conn.get::<&str, String>(name).await?;
+
+        Ok(serde_json::from_str(&res)?)
+    }
 }
 
-fn collection_packages(git_path: PathBuf, pkgs: &DashMap<String, Package>) -> Result<Vec<Package>> {
-    let dir = WalkDir::new(git_path).max_depth(2).min_depth(2);
+fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
+    let dir = WalkDir::new(&git_path).max_depth(2).min_depth(2);
     let mut res = vec![];
 
     for i in dir {
@@ -83,12 +94,7 @@ fn collection_packages(git_path: PathBuf, pkgs: &DashMap<String, Package>) -> Re
         let mut pkgbreak = vec![];
         let mut pkgrecom = vec![];
         let mut pkgprov = vec![];
-        let path = i
-            .path()
-            .parent()
-            .ok_or_eyre("Parent does not exist")?
-            .display()
-            .to_string();
+        let path = i.path().strip_prefix(&git_path)?.display().to_string();
         let mut deps = vec![];
         let mut build_deps = vec![];
 
@@ -133,7 +139,7 @@ fn collection_packages(git_path: PathBuf, pkgs: &DashMap<String, Package>) -> Re
             }
 
             if let Some(v) = context.get("PKGDES") {
-                desc = Some(v.to_string());
+                desc = Some(v.replace("=", ""));
             }
 
             if let Some(v) = context.get("PKGDEP") {
