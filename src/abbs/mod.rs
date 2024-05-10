@@ -5,7 +5,7 @@ use eyre::{eyre, OptionExt, Result};
 use redis::{aio::MultiplexedConnection, AsyncCommands};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use walkdir::WalkDir;
 
 pub struct Abbs {
@@ -55,8 +55,8 @@ impl Abbs {
             .output()
             .await?;
 
-        info!("git pull stdout: {:?}", out.stdout);
-        info!("git pull stderr: {:?}", out.stdout);
+        info!("git pull stdout: {}", String::from_utf8_lossy(&out.stdout).trim());
+        info!("git pull stderr: {}", String::from_utf8_lossy(&out.stdout).trim());
 
         let res = tokio::task::spawn_blocking(move || collection_packages(git_path)).await??;
 
@@ -75,6 +75,7 @@ impl Abbs {
 }
 
 fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
+    info!("Running git pull and insert to database ...");
     let dir = WalkDir::new(&git_path).max_depth(2).min_depth(2);
     let mut res = vec![];
 
@@ -100,14 +101,14 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
 
         let n = i.file_name().to_string_lossy();
 
-        info!("scanning {}", n);
+        debug!("scanning {}", n);
 
         let spec = i.path().join("spec");
 
         if spec.is_file() {
             let c = std::fs::read_to_string(spec)?;
             parse_abbs_file_apml(&c, &mut context).unwrap_or_else(|e| {
-                warn!("{e}");
+                debug!("Failed to parse pkg {n} file using apml: {e}");
                 more_parse(&c, &mut context)
             });
             if let Some(v) = context.get("VER") {
@@ -125,7 +126,7 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
         if defines.is_file() {
             let c = std::fs::read_to_string(defines)?;
             parse_abbs_file_apml(&c, &mut context).unwrap_or_else(|e| {
-                warn!("{e}");
+                debug!("Failed to parse pkg {n} file using apml: {e}");
                 more_parse(&c, &mut context)
             });
 

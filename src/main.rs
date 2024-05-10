@@ -3,12 +3,16 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use abbs::Abbs;
 use axum::{
-    extract::{Query, State}, http::StatusCode, response::IntoResponse, routing::get, Json, Router
+    extract::{Query, State},
+    http::StatusCode,
+    response::IntoResponse,
+    routing::get,
+    Json, Router,
 };
 use eyre::Result;
 use serde::{Deserialize, Serialize};
 use tokio::{sync::Mutex, time::sleep};
-use tracing::{error, level_filters::LevelFilter};
+use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
 #[tokio::main]
@@ -52,7 +56,7 @@ async fn main() -> Result<()> {
 
     tokio::spawn(async move {
         loop {
-            if let Err(e) = update_db(abbs.clone(), abbs_url.clone()).await {
+            if let Err(e) = update_db(abbs.clone(), &abbs_url).await {
                 error!("{e}");
             }
 
@@ -60,6 +64,7 @@ async fn main() -> Result<()> {
         }
     });
 
+    info!("minipkgsite running at: {}", listen);
     let app = Router::new().route("/package", get(package)).with_state(ac);
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     axum::serve(listener, app).await?;
@@ -89,7 +94,7 @@ async fn package(
     }
 }
 
-async fn update_db(abbs: Arc<Mutex<Abbs>>, abbs_url: String) -> Result<()> {
+async fn update_db(abbs: Arc<Mutex<Abbs>>, abbs_url: &str) -> Result<()> {
     let mut abbs = abbs.lock().await;
     abbs.update_all(PathBuf::from(abbs_url)).await?;
 
