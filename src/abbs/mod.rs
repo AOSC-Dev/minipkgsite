@@ -1,19 +1,14 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{collections::HashMap, path::PathBuf};
 
-use dashmap::DashMap;
 use eyre::{eyre, OptionExt, Result};
-use redis::{
-    aio::{ConnectionLike, MultiplexedConnection},
-    AsyncCommands,
-};
-use serde::{de::value, Deserialize, Serialize};
+use redis::{aio::MultiplexedConnection, AsyncCommands};
+use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tracing::{debug, info};
 use walkdir::WalkDir;
 
 pub struct Abbs {
     conn: MultiplexedConnection,
-    pkgs: Arc<DashMap<String, Package>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,9 +33,7 @@ struct PkgStmt {
 
 impl Abbs {
     pub fn new(client: MultiplexedConnection) -> Result<Abbs> {
-        let pkgs = Arc::new(DashMap::new());
-
-        Ok(Abbs { conn: client, pkgs })
+        Ok(Abbs { conn: client })
     }
 
     pub async fn update_all(&mut self, git_path: PathBuf) -> Result<()> {
@@ -234,13 +227,13 @@ fn parse_defines(
 
     if let Some(v) = context.get("PKGDEP") {
         for i in v.split_ascii_whitespace() {
-            deps.push(i.to_string());
+            deps.push(i.replace("=", ""));
         }
     }
 
     if let Some(v) = context.get("BUILDDEP") {
         for i in v.split_ascii_whitespace() {
-            build_deps.push(i.to_string());
+            build_deps.push(i.replace("=", ""));
         }
     }
 
@@ -318,7 +311,7 @@ fn parse_abbs_file_apml(c: &str, context: &mut HashMap<String, String>) -> Resul
             .iter()
             .map(|x| x.to_string())
             .collect::<Vec<_>>()
-            .join(";"))
+            .join("; "))
     })
 }
 

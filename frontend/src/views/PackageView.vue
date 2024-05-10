@@ -9,21 +9,21 @@
     <el-form-item label="Version">
       {{ version }}
     </el-form-item>
-    <el-form-item label="Deps">
+    <el-form-item label="Deps" v-if="deps.length != 0">
       <div class="links">
         <li v-for="d of deps" :key="d">
           <el-link :href="'../package/' + d">{{ d }}</el-link>
         </li>
       </div>
     </el-form-item>
-    <el-form-item label="Build Deps">
+    <el-form-item label="Build Deps" v-if="buildDeps.length != 0">
       <div class="links">
         <li v-for="d of buildDeps" :key="d">
           <el-link :href="'../package/' + d">{{ d }}</el-link>
         </li>
       </div>
     </el-form-item>
-    <el-form-item label="Pkg Breaks">
+    <el-form-item label="Pkg Breaks" v-if="pkgBreaks.length != 0">
       <div class="break-links">
         <li v-for="d of pkgBreaks" :key="d">
           <div class="breaks">
@@ -34,14 +34,14 @@
         </li>
       </div>
     </el-form-item>
-    <el-form-item label="Pkg Recommend">
+    <el-form-item label="Pkg Recommend" v-if="pkgRecommend.length != 0">
       <div class="links">
         <li v-for="d of pkgRecommend" :key="d">
           <el-link :href="'../package/' + d">{{ d }}</el-link>
         </li>
       </div>
     </el-form-item>
-    <el-form-item label="Pkg Provides">
+    <el-form-item label="Pkg Provides" v-if="provides.length != 0">
       <div class="links">
         <li v-for="d of provides" :key="d">
           <el-link :href="'../package/' + d">{{ d }}</el-link>
