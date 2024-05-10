@@ -5,7 +5,7 @@ use eyre::{eyre, OptionExt, Result};
 use redis::{aio::MultiplexedConnection, AsyncCommands};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use walkdir::WalkDir;
 
 pub struct Abbs {
@@ -26,20 +26,12 @@ pub struct Package {
     provides: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct PkgStmt {
     name: String,
     comp: String,
     version: String,
 }
-
-// impl ToRedisArgs for Package {
-//     fn write_redis_args<W>(&self, out: &mut W)
-//     where
-//         W: ?Sized + redis::RedisWrite {
-//         self.name.write_redis_args(out)?;
-//     }
-// }
 
 impl Abbs {
     pub fn new(client: MultiplexedConnection) -> Result<Abbs> {
@@ -55,8 +47,14 @@ impl Abbs {
             .output()
             .await?;
 
-        info!("git pull stdout: {}", String::from_utf8_lossy(&out.stdout).trim());
-        info!("git pull stderr: {}", String::from_utf8_lossy(&out.stdout).trim());
+        info!(
+            "git pull stdout: {}",
+            String::from_utf8_lossy(&out.stdout).trim()
+        );
+        info!(
+            "git pull stderr: {}",
+            String::from_utf8_lossy(&out.stdout).trim()
+        );
 
         let res = tokio::task::spawn_blocking(move || collection_packages(git_path)).await??;
 
@@ -81,8 +79,6 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
 
     for i in dir {
         let mut ver = String::new();
-        let mut name = None;
-        let mut desc = None;
         let i = i?;
 
         let p = i.path().display().to_string();
@@ -92,12 +88,7 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
         }
 
         let mut context = HashMap::new();
-        let mut pkgbreak = vec![];
-        let mut pkgrecom = vec![];
-        let mut pkgprov = vec![];
         let path = i.path().strip_prefix(&git_path)?.display().to_string();
-        let mut deps = vec![];
-        let mut build_deps = vec![];
 
         let n = i.file_name().to_string_lossy();
 
@@ -124,73 +115,153 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
         let defines = i.path().join("autobuild").join("defines");
 
         if defines.is_file() {
-            let c = std::fs::read_to_string(defines)?;
-            parse_abbs_file_apml(&c, &mut context).unwrap_or_else(|e| {
-                debug!("Failed to parse pkg {n} file using apml: {e}");
-                more_parse(&c, &mut context)
-            });
+            let Defines {
+                name,
+                ver,
+                desc,
+                deps,
+                build_deps,
+                pkgbreak,
+                pkgrecom,
+                provides: pkgprov,
+            } = parse_defines(defines, &mut context, &n, &mut ver)?;
 
-            if let Some(v) = context.get("PKGNAME") {
-                name = Some(v.replace("=", ""));
-            }
-
-            if let Some(v) = context.get("PKGEPOCH") {
-                ver.insert(0, ':');
-                ver.insert_str(0, &v.replace("=", ""));
-            }
-
-            if let Some(v) = context.get("PKGDES") {
-                desc = Some(v.replace("=", ""));
-            }
-
-            if let Some(v) = context.get("PKGDEP") {
-                for i in v.split_ascii_whitespace() {
-                    deps.push(i.to_string());
-                }
-            }
-
-            if let Some(v) = context.get("BUILDDEP") {
-                for i in v.split_ascii_whitespace() {
-                    build_deps.push(i.to_string());
-                }
-            }
-
-            if let Some(v) = context.get("PKGBREAK") {
-                for i in v.split_ascii_whitespace() {
-                    pkgbreak.push(PkgStmt::from(i));
-                }
-            }
-
-            if let Some(v) = context.get("PKGRECOM") {
-                for i in v.split_ascii_whitespace() {
-                    pkgrecom.push(i.replace("=", ""));
-                }
-            }
-
-            if let Some(v) = context.get("PKGPROV") {
-                for i in v.split_ascii_whitespace() {
-                    pkgprov.push(i.to_string());
-                }
-            }
+            res.push(Package {
+                name: name.ok_or_eyre(format!("Failed to get pkg name: {}", n))?,
+                version: ver,
+                desc: desc.ok_or_eyre("Failed to get pkg desc")?,
+                path,
+                pkgbreak,
+                pkgrecom,
+                provides: pkgprov,
+                deps,
+                build_deps,
+            })
         } else {
-            warn!("{} has no autobuild dir", i.path().display());
-            continue;
-        }
+            let verc = ver.clone();
+            for j in WalkDir::new(i.path()).min_depth(1).max_depth(1) {
+                let mut ver = verc.clone();
+                let j = j?;
+                if !j.path().is_dir() {
+                    continue;
+                }
 
-        res.push(Package {
-            name: name.ok_or_eyre("Failed to get pkg name")?,
-            version: ver,
-            desc: desc.ok_or_eyre("Failed to get pkg desc")?,
-            path,
-            pkgbreak,
-            pkgrecom,
-            provides: pkgprov,
-            deps,
-            build_deps,
-        })
+                let defines = j.path().join("defines");
+                if defines.is_file() {
+                    let Defines {
+                        name,
+                        ver,
+                        desc,
+                        deps,
+                        build_deps,
+                        pkgbreak,
+                        pkgrecom,
+                        provides: pkgprov,
+                    } = parse_defines(defines, &mut context, &n, &mut ver)?;
+
+                    res.push(Package {
+                        name: name.ok_or_eyre(format!("Failed to get pkg name: {}", n))?,
+                        version: ver,
+                        desc: desc.ok_or_eyre("Failed to get pkg desc")?,
+                        path: path.clone(),
+                        pkgbreak,
+                        pkgrecom,
+                        provides: pkgprov,
+                        deps,
+                        build_deps,
+                    });
+                }
+            }
+        }
     }
 
     Ok(res)
+}
+
+struct Defines {
+    name: Option<String>,
+    ver: String,
+    desc: Option<String>,
+    deps: Vec<String>,
+    build_deps: Vec<String>,
+    pkgbreak: Vec<PkgStmt>,
+    pkgrecom: Vec<String>,
+    provides: Vec<String>,
+}
+
+fn parse_defines(
+    defines: PathBuf,
+    context: &mut HashMap<String, String>,
+    n: &str,
+    ver: &mut String,
+) -> Result<Defines> {
+    let mut name = None;
+    let mut desc = None;
+    let mut deps = vec![];
+    let mut build_deps = vec![];
+    let mut pkgbreak = vec![];
+    let mut pkgrecom = vec![];
+    let mut provides = vec![];
+
+    let c = std::fs::read_to_string(defines)?;
+    parse_abbs_file_apml(&c, context).unwrap_or_else(|e| {
+        debug!("Failed to parse pkg {n} file using apml: {e}");
+        more_parse(&c, context)
+    });
+
+    if let Some(v) = context.get("PKGNAME") {
+        name = Some(v.replace("=", ""));
+    }
+
+    if let Some(v) = context.get("PKGEPOCH") {
+        ver.insert(0, ':');
+        ver.insert_str(0, &v.replace("=", ""));
+    }
+
+    if let Some(v) = context.get("PKGDES") {
+        desc = Some(v.replace("=", ""));
+    }
+
+    if let Some(v) = context.get("PKGDEP") {
+        for i in v.split_ascii_whitespace() {
+            deps.push(i.to_string());
+        }
+    }
+
+    if let Some(v) = context.get("BUILDDEP") {
+        for i in v.split_ascii_whitespace() {
+            build_deps.push(i.to_string());
+        }
+    }
+
+    if let Some(v) = context.get("PKGBREAK") {
+        for i in v.split_ascii_whitespace() {
+            pkgbreak.push(PkgStmt::from(i));
+        }
+    }
+
+    if let Some(v) = context.get("PKGRECOM") {
+        for i in v.split_ascii_whitespace() {
+            pkgrecom.push(i.replace("=", ""));
+        }
+    }
+
+    if let Some(v) = context.get("PKGPROV") {
+        for i in v.split_ascii_whitespace() {
+            provides.push(i.to_string());
+        }
+    }
+
+    Ok(Defines {
+        name,
+        ver: ver.to_string(),
+        desc,
+        deps,
+        build_deps,
+        pkgbreak,
+        pkgrecom,
+        provides,
+    })
 }
 
 impl From<&str> for PkgStmt {
