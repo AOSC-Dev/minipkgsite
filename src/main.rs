@@ -4,7 +4,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 use abbs::Abbs;
 use axum::{
     extract::{Query, State},
-    http::StatusCode,
+    http::{HeaderValue, Method, StatusCode},
     response::IntoResponse,
     routing::get,
     Json, Router,
@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{sync::Mutex, time::sleep};
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -65,7 +66,17 @@ async fn main() -> Result<()> {
     });
 
     info!("minipkgsite running at: {}", listen);
-    let app = Router::new().route("/package", get(package)).with_state(ac);
+    let app = Router::new()
+        .route("/package", get(package))
+        .route("/all", get(package_all))
+        .with_state(ac)
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_headers(Any)
+                .allow_methods(Any),
+        );
+
     let listener = tokio::net::TcpListener::bind(&listen).await?;
     axum::serve(listener, app).await?;
 
@@ -84,6 +95,21 @@ async fn package(
     let mut abbs = state.lock().await;
     let pkg = payload.name;
     let pkg = abbs.get(&pkg).await;
+
+    match pkg {
+        Ok(pkg) => Ok(Json(pkg)),
+        Err(e) => {
+            error!("{e}");
+            Err(StatusCode::NOT_FOUND)
+        }
+    }
+}
+
+async fn package_all(
+    State(state): State<Arc<Mutex<Abbs>>>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let mut abbs = state.lock().await;
+    let pkg = abbs.all().await;
 
     match pkg {
         Ok(pkg) => Ok(Json(pkg)),

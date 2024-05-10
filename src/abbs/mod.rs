@@ -2,7 +2,10 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use dashmap::DashMap;
 use eyre::{eyre, OptionExt, Result};
-use redis::{aio::MultiplexedConnection, AsyncCommands};
+use redis::{
+    aio::{ConnectionLike, MultiplexedConnection},
+    AsyncCommands,
+};
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tracing::{debug, info};
@@ -69,6 +72,13 @@ impl Abbs {
         let res = self.conn.get::<&str, String>(name).await?;
 
         Ok(serde_json::from_str(&res)?)
+    }
+
+    pub async fn all(&mut self) -> Result<Vec<String>> {
+        Ok(redis::cmd("KEYS")
+            .arg("*")
+            .query_async(&mut self.conn)
+            .await?)
     }
 }
 
