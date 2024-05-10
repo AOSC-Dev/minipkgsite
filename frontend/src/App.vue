@@ -4,10 +4,14 @@
     :fetch-suggestions="querySearchAsync"
     placeholder="Please input"
     @select="handleSelect"
+    style="width: 600px"
+    size="large"
+    :suffix-icon="Search"
   />
 </template>
 
 <script setup>
+import { Search } from '@element-plus/icons-vue'
 import { onMounted, ref } from 'vue'
 
 const state = ref('')
