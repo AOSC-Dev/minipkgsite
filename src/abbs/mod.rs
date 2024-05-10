@@ -6,7 +6,7 @@ use redis::{
     aio::{ConnectionLike, MultiplexedConnection},
     AsyncCommands,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::value, Deserialize, Serialize};
 use tokio::process::Command;
 use tracing::{debug, info};
 use walkdir::WalkDir;
@@ -276,6 +276,12 @@ fn parse_defines(
 
 impl From<&str> for PkgStmt {
     fn from(value: &str) -> Self {
+        let value = if &value[..1] == "=" {
+            &value[1..]
+        } else {
+            value
+        };
+
         let mut name = String::new();
         let mut comp = String::new();
         let mut version = String::new();
