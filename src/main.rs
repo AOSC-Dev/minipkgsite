@@ -4,7 +4,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 use abbs::Abbs;
 use axum::{
     extract::{Query, State},
-    http::{HeaderValue, Method, StatusCode},
+    http::StatusCode,
     response::IntoResponse,
     routing::get,
     Json, Router,
@@ -12,9 +12,9 @@ use axum::{
 use eyre::Result;
 use serde::{Deserialize, Serialize};
 use tokio::{sync::Mutex, time::sleep};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
-use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
