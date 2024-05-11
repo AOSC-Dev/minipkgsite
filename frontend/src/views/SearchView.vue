@@ -46,7 +46,7 @@ const createFilter = (queryString) => {
 }
 
 const handleSelect = (item) => {
-  router.push(`/package/${item}`)
+  router.push(`/package/${item.value}`)
 }
 
 onMounted(async () => {
