@@ -55,6 +55,7 @@
 export default {
   data() {
     return {
+      uri: import.meta.env.VITE_MINIPKGSITE,
       pkgName: '',
       desc: '',
       version: '',
@@ -69,7 +70,7 @@ export default {
     name: String
   },
   async mounted() {
-    const resp = await fetch(`http://127.0.0.1:2333/package?name=${this.name}`)
+    const resp = await fetch(`${this.uri}/package?name=${this.name}`)
     const data = await resp.json()
     this.pkgName = data.name
     this.version = data.version
