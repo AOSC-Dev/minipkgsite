@@ -70,6 +70,7 @@ async fn main() -> Result<()> {
     let app = Router::new()
         .route("/package", get(package))
         .route("/all", get(package_all))
+        .route("/search", get(package_search))
         .with_state(ac)
         .layer(
             CorsLayer::new()
@@ -111,6 +112,23 @@ async fn package_all(
 ) -> Result<impl IntoResponse, StatusCode> {
     let mut abbs = state.lock().await;
     let pkg = abbs.all().await;
+
+    match pkg {
+        Ok(pkg) => Ok(Json(pkg)),
+        Err(e) => {
+            error!("{e}");
+            Err(StatusCode::NOT_FOUND)
+        }
+    }
+}
+
+async fn package_search(
+    State(state): State<Arc<Mutex<Abbs>>>,
+    Query(resp): Query<Response>,
+) -> Result<impl IntoResponse, StatusCode> {
+    let name = resp.name;
+    let mut abbs = state.lock().await;
+    let pkg = abbs.search_by_stars(&name).await;
 
     match pkg {
         Ok(pkg) => Ok(Json(pkg)),

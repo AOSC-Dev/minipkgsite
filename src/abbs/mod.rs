@@ -56,23 +56,38 @@ impl Abbs {
         let res = tokio::task::spawn_blocking(move || collection_packages(git_path)).await??;
 
         for i in res {
-            self.conn.hset(Self::TABLE_NAME_STABLE, &i.name, serde_json::to_string(&i)?).await?;
+            self.conn
+                .set(
+                    format!("{}:{}", Self::TABLE_NAME_STABLE, i.name),
+                    serde_json::to_string(&i)?,
+                )
+                .await?;
         }
 
         Ok(())
     }
 
     pub async fn get(&mut self, name: &str) -> Result<Package> {
-        let res = self.conn.hget::<&str, &str, String>(Self::TABLE_NAME_STABLE, name).await?;
+        let res = self
+            .conn
+            .hget::<&str, &str, String>(Self::TABLE_NAME_STABLE, name)
+            .await?;
 
         Ok(serde_json::from_str(&res)?)
     }
 
     pub async fn all(&mut self) -> Result<Vec<String>> {
-        Ok(redis::cmd("HKEYS")
-            .arg(Self::TABLE_NAME_STABLE)
+        Ok(redis::cmd("KEYS")
+            .arg(format!("{}:*", Self::TABLE_NAME_STABLE))
             .query_async(&mut self.conn)
             .await?)
+    }
+
+    pub async fn search_by_stars(&mut self, stars: &str) -> Result<Vec<String>> {
+        Ok(redis::cmd("KEYS")
+        .arg(format!("{}:{stars}*", Self::TABLE_NAME_STABLE))
+        .query_async(&mut self.conn)
+        .await?)
     }
 }
 

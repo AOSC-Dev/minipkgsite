@@ -13,41 +13,32 @@
 <script setup>
 import router from '@/router'
 import { Search } from '@element-plus/icons-vue'
-import { onMounted, ref } from 'vue'
+import { ref } from 'vue'
 
 const state = ref('')
-const links = ref([])
 
-const loadAll = async () => {
+let timeout
+const querySearchAsync = async (queryString, cb) => {
   const uri = import.meta.env.VITE_MINIPKGSITE
-  const resp = await fetch(`${uri}/all`)
-  const data = await resp.json()
-  // only proceed once second promise is resolved
-  return data
-}
+  const query = queryString.toLowerCase()
+  const resp = await fetch(`${uri}/search?name=${query}`)
+  const results = await resp.json()
 
-const querySearchAsync = (queryString, cb) => {
-  const results = queryString ? links.value.filter(createFilter(queryString)) : links.value
-
-  cb(
-    results.map((v) => {
-      return {
-        value: v
-      }
-    })
+  clearTimeout(timeout)
+  timeout = setTimeout(
+    () =>
+      cb(
+        results.map((v) => {
+          return {
+            value: v.replace('aosc-packages-stable:', '')
+          }
+        })
+      ),
+    500
   )
-}
-const createFilter = (queryString) => {
-  return (restaurant) => {
-    return restaurant.startsWith(queryString.toLowerCase())
-  }
 }
 
 const handleSelect = (item) => {
   router.push(`/package/${item.value}`)
 }
-
-onMounted(async () => {
-  links.value = await loadAll()
-})
 </script>
