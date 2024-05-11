@@ -30,7 +30,7 @@ const querySearchAsync = async (queryString, cb) => {
       cb(
         results.map((v) => {
           return {
-            value: v.replace('aosc-packages-stable:', '')
+            value: v
           }
         })
       ),

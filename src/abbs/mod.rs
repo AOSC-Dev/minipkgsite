@@ -77,17 +77,33 @@ impl Abbs {
     }
 
     pub async fn all(&mut self) -> Result<Vec<String>> {
-        Ok(redis::cmd("KEYS")
+        let mut keys: Vec<String> = redis::cmd("KEYS")
             .arg(format!("{}:*", Self::TABLE_NAME_STABLE))
             .query_async(&mut self.conn)
-            .await?)
+            .await?;
+
+        let prefix = format!("{}:", Self::TABLE_NAME_STABLE);
+
+        for i in &mut keys {
+            *i = i.strip_prefix(&prefix).unwrap().to_string();
+        }
+
+        Ok(keys)
     }
 
     pub async fn search_by_stars(&mut self, stars: &str) -> Result<Vec<String>> {
-        Ok(redis::cmd("KEYS")
-        .arg(format!("{}:{stars}*", Self::TABLE_NAME_STABLE))
-        .query_async(&mut self.conn)
-        .await?)
+        let mut keys: Vec<String> = redis::cmd("KEYS")
+            .arg(format!("{}:{stars}*", Self::TABLE_NAME_STABLE))
+            .query_async(&mut self.conn)
+            .await?;
+
+        let prefix = format!("{}:", Self::TABLE_NAME_STABLE);
+
+        for i in &mut keys {
+            *i = i.strip_prefix(&prefix).unwrap().to_string();
+        }
+
+        Ok(keys)
     }
 }
 
