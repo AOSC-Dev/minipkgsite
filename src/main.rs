@@ -18,6 +18,7 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, Env
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    dotenvy::dotenv().ok();
     let abbs_url = std::env::var("ABBS_TREE")?;
     let redis = std::env::var("REDIS")?;
     let listen = std::env::var("MINIPKGSITE")?;
