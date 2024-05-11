@@ -26,20 +26,16 @@ const loadAll = async () => {
   return data
 }
 
-let timeout
 const querySearchAsync = (queryString, cb) => {
   const results = queryString ? links.value.filter(createFilter(queryString)) : links.value
 
-  clearTimeout(timeout)
-  timeout = setTimeout(() => {
-    cb(
-      results.map((v) => {
-        return {
-          value: v
-        }
-      })
-    )
-  }, 500 * Math.random())
+  cb(
+    results.map((v) => {
+      return {
+        value: v
+      }
+    })
+  )
 }
 const createFilter = (queryString) => {
   return (restaurant) => {
