@@ -39,7 +39,7 @@ const querySearchAsync = (queryString, cb) => {
         }
       })
     )
-  }, 3000 * Math.random())
+  }, 500 * Math.random())
 }
 const createFilter = (queryString) => {
   return (restaurant) => {
