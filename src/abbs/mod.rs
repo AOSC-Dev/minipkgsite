@@ -214,44 +214,59 @@ fn parse_defines(
     });
 
     if let Some(v) = context.get("PKGNAME") {
-        name = Some(v.replace("=", ""));
+        name = Some(v.replace("=", "").trim().to_string());
     }
 
     if let Some(v) = context.get("PKGEPOCH") {
         ver.insert(0, ':');
-        ver.insert_str(0, &v.replace("=", ""));
+        ver.insert_str(0, &v.replace("=", "").trim().to_string());
     }
 
     if let Some(v) = context.get("PKGDES") {
-        desc = Some(v.replace("=", ""));
+        desc = Some(v.replace("=", "").trim().to_string());
     }
 
     if let Some(v) = context.get("PKGDEP") {
-        for i in v.split_ascii_whitespace() {
+        for i in v.trim().split_ascii_whitespace() {
+            if i == "\\" {
+                continue;
+            }
             deps.push(i.replace("=", ""));
         }
     }
 
     if let Some(v) = context.get("BUILDDEP") {
-        for i in v.split_ascii_whitespace() {
+        for i in v.trim().split_ascii_whitespace() {
+            if i == "\\" {
+                continue;
+            }
             build_deps.push(i.replace("=", ""));
         }
     }
 
     if let Some(v) = context.get("PKGBREAK") {
-        for i in v.split_ascii_whitespace() {
+        for i in v.trim().split_ascii_whitespace() {
+            if i == "\\" {
+                continue;
+            }
             pkgbreak.push(PkgStmt::from(i));
         }
     }
 
     if let Some(v) = context.get("PKGRECOM") {
-        for i in v.split_ascii_whitespace() {
+        for i in v.trim().split_ascii_whitespace() {
+            if i == "\\" {
+                continue;
+            }
             pkgrecom.push(i.replace("=", ""));
         }
     }
 
     if let Some(v) = context.get("PKGPROV") {
-        for i in v.split_ascii_whitespace() {
+        for i in v.trim().split_ascii_whitespace() {
+            if i == "\\" {
+                continue;
+            }
             provides.push(i.to_string());
         }
     }
