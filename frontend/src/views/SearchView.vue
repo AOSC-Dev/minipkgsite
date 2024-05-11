@@ -2,7 +2,7 @@
   <el-autocomplete
     v-model="state"
     :fetch-suggestions="querySearchAsync"
-    placeholder="Please input"
+    placeholder="Input package name (e.g vim)"
     @select="handleSelect"
     style="width: 600px"
     size="large"
