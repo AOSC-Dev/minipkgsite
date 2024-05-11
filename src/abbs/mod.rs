@@ -70,30 +70,23 @@ impl Abbs {
     pub async fn get(&mut self, name: &str) -> Result<Package> {
         let res = self
             .conn
-            .hget::<&str, &str, String>(Self::TABLE_NAME_STABLE, name)
+            .get::<&str, String>(&format!("{}:{name}", Self::TABLE_NAME_STABLE))
             .await?;
 
         Ok(serde_json::from_str(&res)?)
     }
 
     pub async fn all(&mut self) -> Result<Vec<String>> {
-        let mut keys: Vec<String> = redis::cmd("KEYS")
-            .arg(format!("{}:*", Self::TABLE_NAME_STABLE))
-            .query_async(&mut self.conn)
-            .await?;
-
-        let prefix = format!("{}:", Self::TABLE_NAME_STABLE);
-
-        for i in &mut keys {
-            *i = i.strip_prefix(&prefix).unwrap().to_string();
-        }
-
-        Ok(keys)
+        Ok(self.query_key_cmd_to_vec("*").await?)
     }
 
     pub async fn search_by_stars(&mut self, stars: &str) -> Result<Vec<String>> {
+        Ok(self.query_key_cmd_to_vec(&format!("{stars}*")).await?)
+    }
+
+    async fn query_key_cmd_to_vec(&mut self, query: &str) -> Result<Vec<String>, eyre::Error> {
         let mut keys: Vec<String> = redis::cmd("KEYS")
-            .arg(format!("{}:{stars}*", Self::TABLE_NAME_STABLE))
+            .arg(format!("{}:{query}", Self::TABLE_NAME_STABLE))
             .query_async(&mut self.conn)
             .await?;
 
