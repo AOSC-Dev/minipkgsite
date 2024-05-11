@@ -9,6 +9,14 @@
     <el-form-item label="Version">
       {{ version }}
     </el-form-item>
+    <el-form-item label="Path">
+      <div>
+        {{ path }}
+        <el-link :href="'https://github.com/aosc-dev/aosc-os-abbs/tree/stable/' + path"
+          >(Github)</el-link
+        >
+      </div>
+    </el-form-item>
     <el-form-item label="Deps" v-if="deps.length != 0">
       <div class="links">
         <li v-for="d of deps" :key="d">
@@ -59,6 +67,7 @@ export default {
       pkgName: '',
       desc: '',
       version: '',
+      path: '',
       deps: [],
       buildDeps: [],
       pkgBreaks: [],
@@ -74,6 +83,7 @@ export default {
     const data = await resp.json()
     this.pkgName = data.name
     this.version = data.version
+    this.path = data.path
     this.desc = data.desc
     this.deps = data.deps
     this.buildDeps = data.build_deps
