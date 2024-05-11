@@ -15,8 +15,16 @@ export MINIPKGSITE=127.0.0.1:2333
 
 # another terminal
 
+cd frontend
+
 # You can use .env in SRCDIR/frontend
 export VITE_MINIPKGSITE=http://127.0.0.1:2333
 
+# Run on develop mode
 yarn dev
+
+# Build/run on release mode
+yarn build
+cd dist
+miniserve --index index.html
 ```
