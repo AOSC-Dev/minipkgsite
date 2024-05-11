@@ -32,6 +32,7 @@ struct PkgStmt {
 }
 
 impl Abbs {
+    const TABLE_NAME_STABLE: &'static str = "aosc-packages-stable";
     pub fn new(client: MultiplexedConnection) -> Result<Abbs> {
         Ok(Abbs { conn: client })
     }
@@ -55,21 +56,21 @@ impl Abbs {
         let res = tokio::task::spawn_blocking(move || collection_packages(git_path)).await??;
 
         for i in res {
-            self.conn.hset("aosc-packages-stable", &i.name, serde_json::to_string(&i)?).await?;
+            self.conn.hset(Self::TABLE_NAME_STABLE, &i.name, serde_json::to_string(&i)?).await?;
         }
 
         Ok(())
     }
 
     pub async fn get(&mut self, name: &str) -> Result<Package> {
-        let res = self.conn.hget::<&str, &str, String>("aosc-packages-stable", name).await?;
+        let res = self.conn.hget::<&str, &str, String>(Self::TABLE_NAME_STABLE, name).await?;
 
         Ok(serde_json::from_str(&res)?)
     }
 
     pub async fn all(&mut self) -> Result<Vec<String>> {
         Ok(redis::cmd("HKEYS")
-            .arg("aosc-packages-stable")
+            .arg(Self::TABLE_NAME_STABLE)
             .query_async(&mut self.conn)
             .await?)
     }
