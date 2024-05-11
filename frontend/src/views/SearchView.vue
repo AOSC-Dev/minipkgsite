@@ -23,11 +23,7 @@ const loadAll = async () => {
   const resp = await fetch(`${uri}/all`)
   const data = await resp.json()
   // only proceed once second promise is resolved
-  return data.map((v) => {
-    return {
-      value: v
-    }
-  })
+  return data
 }
 
 let timeout
@@ -36,16 +32,23 @@ const querySearchAsync = (queryString, cb) => {
 
   clearTimeout(timeout)
   timeout = setTimeout(() => {
-    cb(results)
+    cb(
+      results.map((v) => {
+        return {
+          value: v
+        }
+      })
+    )
   }, 3000 * Math.random())
 }
 const createFilter = (queryString) => {
   return (restaurant) => {
-    return restaurant.value.indexOf(queryString.toLowerCase()) === 0
+    return restaurant.startsWith(queryString.toLowerCase())
   }
 }
 
 const handleSelect = (item) => {
+  
   router.push(`/package/${item.value}`)
 }
 
