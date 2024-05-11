@@ -55,21 +55,21 @@ impl Abbs {
         let res = tokio::task::spawn_blocking(move || collection_packages(git_path)).await??;
 
         for i in res {
-            self.conn.set(&i.name, serde_json::to_string(&i)?).await?;
+            self.conn.hset("aosc-packages-stable", &i.name, serde_json::to_string(&i)?).await?;
         }
 
         Ok(())
     }
 
     pub async fn get(&mut self, name: &str) -> Result<Package> {
-        let res = self.conn.get::<&str, String>(name).await?;
+        let res = self.conn.hget::<&str, &str, String>("aosc-packages-stable", name).await?;
 
         Ok(serde_json::from_str(&res)?)
     }
 
     pub async fn all(&mut self) -> Result<Vec<String>> {
-        Ok(redis::cmd("KEYS")
-            .arg("*")
+        Ok(redis::cmd("HKEYS")
+            .arg("aosc-packages-stable")
             .query_async(&mut self.conn)
             .await?)
     }
