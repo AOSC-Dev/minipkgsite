@@ -76,8 +76,13 @@ impl Abbs {
         Ok(serde_json::from_str(&res)?)
     }
 
-    pub async fn all(&mut self) -> Result<Vec<String>> {
-        Ok(self.query_key_cmd_to_vec("*").await?)
+    pub async fn all(&mut self) -> Result<Vec<Package>> {
+        let mut res = vec![];
+        for i in self.query_key_cmd_to_vec("*").await? {
+            res.push(self.get(&i).await?);
+        }
+
+        Ok(res)
     }
 
     pub async fn search_by_stars(&mut self, stars: &str) -> Result<Vec<String>> {
