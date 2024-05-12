@@ -17,6 +17,7 @@ pub struct Package {
     version: String,
     desc: String,
     path: String,
+    section: String,
     deps: Vec<String>,
     build_deps: Vec<String>,
     pkgbreak: Vec<PkgStmt>,
@@ -157,6 +158,7 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
                 pkgbreak,
                 pkgrecom,
                 provides: pkgprov,
+                section,
             } = parse_defines(defines, &mut context, &n, &mut ver)?;
 
             res.push(Package {
@@ -169,6 +171,7 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
                 provides: pkgprov,
                 deps,
                 build_deps,
+                section,
             })
         } else {
             let verc = ver.clone();
@@ -190,6 +193,7 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
                         pkgbreak,
                         pkgrecom,
                         provides: pkgprov,
+                        section,
                     } = parse_defines(defines, &mut context, &n, &mut ver)?;
 
                     res.push(Package {
@@ -202,6 +206,7 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
                         provides: pkgprov,
                         deps,
                         build_deps,
+                        section,
                     });
                 }
             }
@@ -214,6 +219,7 @@ fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
 struct Defines {
     name: Option<String>,
     ver: String,
+    section: String,
     desc: Option<String>,
     deps: Vec<String>,
     build_deps: Vec<String>,
@@ -230,6 +236,7 @@ fn parse_defines(
 ) -> Result<Defines> {
     let mut name = None;
     let mut desc = None;
+    let mut pkgsec = None;
     let mut deps = vec![];
     let mut build_deps = vec![];
     let mut pkgbreak = vec![];
@@ -300,6 +307,10 @@ fn parse_defines(
         }
     }
 
+    if let Some(v) = context.get("PKGSEC") {
+        pkgsec = Some(v.trim().replace("=", ""));
+    }
+
     Ok(Defines {
         name,
         ver: ver.to_string(),
@@ -309,6 +320,7 @@ fn parse_defines(
         pkgbreak,
         pkgrecom,
         provides,
+        section: pkgsec.unwrap_or("".to_string()),
     })
 }
 
