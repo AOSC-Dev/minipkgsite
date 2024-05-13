@@ -23,33 +23,41 @@ async fn main() -> Result<()> {
     let redis = std::env::var("REDIS")?;
     let listen = std::env::var("MINIPKGSITE")?;
 
-    let env_log = EnvFilter::try_from_default_env();
 
-    if let Ok(filter) = env_log {
-        tracing_subscriber::registry()
-            .with(
-                fmt::layer()
-                    .event_format(
-                        tracing_subscriber::fmt::format()
-                            .with_file(true)
-                            .with_line_number(true),
-                    )
-                    .with_filter(filter),
-            )
-            .init();
-    } else {
-        tracing_subscriber::registry()
-            .with(
-                fmt::layer()
-                    .event_format(
-                        tracing_subscriber::fmt::format()
-                            .with_file(true)
-                            .with_line_number(true),
-                    )
-                    .with_filter(LevelFilter::INFO),
-            )
-            .init();
+    #[cfg(feature = "tokio-console")]
+    console_subscriber::init();
+
+    #[cfg(not(feature = "tokio-console"))]
+    {
+        let env_log = EnvFilter::try_from_default_env();
+
+        if let Ok(filter) = env_log {
+            tracing_subscriber::registry()
+                .with(
+                    fmt::layer()
+                        .event_format(
+                            tracing_subscriber::fmt::format()
+                                .with_file(true)
+                                .with_line_number(true),
+                        )
+                        .with_filter(filter),
+                )
+                .init();
+        } else {
+            tracing_subscriber::registry()
+                .with(
+                    fmt::layer()
+                        .event_format(
+                            tracing_subscriber::fmt::format()
+                                .with_file(true)
+                                .with_line_number(true),
+                        )
+                        .with_filter(LevelFilter::INFO),
+                )
+                .init();
+        }
     }
+
 
     let client = redis::Client::open(redis)?;
     let conn = client.get_multiplexed_tokio_connection().await?;
