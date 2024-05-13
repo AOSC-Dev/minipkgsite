@@ -102,7 +102,7 @@ impl Abbs {
     }
 
     pub async fn search_by_stars(&mut self, stars: &str) -> Result<Vec<String>> {
-        Ok(self.query_key_cmd_to_vec(&format!("{stars}*")).await?)
+        self.query_key_cmd_to_vec(&format!("{stars}*")).await
     }
 
     async fn query_key_cmd_to_vec(&mut self, query: &str) -> Result<Vec<String>, eyre::Error> {
@@ -278,16 +278,16 @@ fn parse_defines(
     });
 
     if let Some(v) = context.get("PKGNAME") {
-        name = Some(v.replace("=", "").trim().to_string());
+        name = Some(v.replace('=', "").trim().to_string());
     }
 
     if let Some(v) = context.get("PKGEPOCH") {
         ver.insert(0, ':');
-        ver.insert_str(0, &v.replace("=", "").trim().to_string());
+        ver.insert_str(0, v.replace('=', "").trim());
     }
 
     if let Some(v) = context.get("PKGDES") {
-        desc = Some(v.replace("=", "").trim().to_string());
+        desc = Some(v.replace('=', "").trim().to_string());
     }
 
     if let Some(v) = context.get("PKGDEP") {
@@ -295,7 +295,7 @@ fn parse_defines(
             if i == "\\" {
                 continue;
             }
-            deps.push(i.replace("=", ""));
+            deps.push(i.replace('=', ""));
         }
     }
 
@@ -304,7 +304,7 @@ fn parse_defines(
             if i == "\\" {
                 continue;
             }
-            build_deps.push(i.replace("=", ""));
+            build_deps.push(i.replace('=', ""));
         }
     }
 
@@ -322,7 +322,7 @@ fn parse_defines(
             if i == "\\" {
                 continue;
             }
-            pkgrecom.push(i.replace("=", ""));
+            pkgrecom.push(i.replace('=', ""));
         }
     }
 
@@ -336,7 +336,7 @@ fn parse_defines(
     }
 
     if let Some(v) = context.get("PKGSEC") {
-        pkgsec = Some(v.trim().replace("=", ""));
+        pkgsec = Some(v.trim().replace('=', ""));
     }
 
     Ok(Defines {
@@ -406,7 +406,7 @@ fn more_parse(c: &str, context: &mut HashMap<String, String>) {
     ] {
         for j in c.split('\n') {
             if let Some(v) = j.strip_prefix(i) {
-                context.insert(i.to_string(), v.replace("\"", ""));
+                context.insert(i.to_string(), v.replace('"', ""));
             }
         }
     }
