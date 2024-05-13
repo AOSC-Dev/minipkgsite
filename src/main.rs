@@ -65,11 +65,13 @@ async fn main() -> Result<()> {
     let ac = abbs.clone();
 
     tokio::spawn(async move {
+        let mut first_time = true;
         loop {
-            if let Err(e) = update_db(abbs.clone(), &abbs_url).await {
+            if let Err(e) = update_db(abbs.clone(), &abbs_url, first_time).await {
                 error!("{e}");
             }
 
+            first_time = false;
             sleep(Duration::from_secs(60)).await;
         }
     });
@@ -147,9 +149,9 @@ async fn package_search(
     }
 }
 
-async fn update_db(abbs: Arc<Mutex<Abbs>>, abbs_url: &str) -> Result<()> {
+async fn update_db(abbs: Arc<Mutex<Abbs>>, abbs_url: &str, first_time: bool) -> Result<()> {
     let mut abbs = abbs.lock().await;
-    abbs.update_all(PathBuf::from(abbs_url)).await?;
+    abbs.update_all(PathBuf::from(abbs_url), first_time).await?;
 
     Ok(())
 }

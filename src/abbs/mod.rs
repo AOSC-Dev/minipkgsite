@@ -1,4 +1,7 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 use eyre::{eyre, OptionExt, Result};
 use redis::{aio::MultiplexedConnection, AsyncCommands};
@@ -38,7 +41,9 @@ impl Abbs {
         Ok(Abbs { conn: client })
     }
 
-    pub async fn update_all(&mut self, git_path: PathBuf) -> Result<()> {
+    pub async fn update_all(&mut self, git_path: PathBuf, first_time: bool) -> Result<()> {
+        let old = head_commit(&git_path).await?;
+
         let out = Command::new("git")
             .arg("pull")
             .current_dir(&git_path)
@@ -54,9 +59,19 @@ impl Abbs {
             String::from_utf8_lossy(&out.stdout).trim()
         );
 
+        let new = head_commit(&git_path).await?;
+
+        if old == new && !first_time {
+            info!("No need to update tree");
+            return Ok(());
+        }
+
+        info!("Updating tree ...");
+
         let res = tokio::task::spawn_blocking(move || collection_packages(git_path)).await??;
 
         for i in res {
+            debug!("insert {}", i.name);
             self.conn
                 .set(
                     format!("{}:{}", Self::TABLE_NAME_STABLE, i.name),
@@ -104,6 +119,19 @@ impl Abbs {
 
         Ok(keys)
     }
+}
+
+async fn head_commit(git_path: &Path) -> Result<String> {
+    let cmd = Command::new("git")
+        .arg("rev-parse")
+        .arg("HEAD")
+        .current_dir(git_path)
+        .output()
+        .await?;
+
+    let commit = String::from_utf8_lossy(&cmd.stdout).trim().to_string();
+
+    Ok(commit)
 }
 
 fn collection_packages(git_path: PathBuf) -> Result<Vec<Package>> {
